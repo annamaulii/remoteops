@@ -12,6 +12,22 @@ jobs:
   test:
     name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.3-alpine
+        env:
+          POSTGRES_DB: remoteops
+          POSTGRES_USER: remoteops
+          POSTGRES_PASSWORD: remoteops
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U remoteops -d remoteops"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+psycopg://remoteops:remoteops@localhost:5432/remoteops
     strategy:
       fail-fast: false
       matrix:
