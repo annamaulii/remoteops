@@ -34,6 +34,27 @@ def test_users_table_has_expected_columns() -> None:
     } == {("email",)}
 
 
+def test_auth_tokens_table_has_expected_columns() -> None:
+    inspector = inspect(engine)
+    columns = inspector.get_columns("auth_tokens")
+
+    assert {column["name"] for column in columns} == {
+        "id",
+        "user_id",
+        "token_hash",
+        "purpose",
+        "expires_at",
+        "created_at",
+    }
+    assert inspector.get_pk_constraint("auth_tokens")["constrained_columns"] == [
+        "id"
+    ]
+    assert {
+        constraint["name"]
+        for constraint in inspector.get_check_constraints("auth_tokens")
+    } == {"valid_auth_token_purpose"}
+
+
 def test_organization_memberships_table_has_expected_columns() -> None:
     inspector = inspect(engine)
     columns = inspector.get_columns("organization_memberships")

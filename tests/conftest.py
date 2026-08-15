@@ -10,6 +10,7 @@ from remoteops.main import app
 from remoteops.models import (
     Approval,
     AuditEvent,
+    AuthToken,
     Contractor,
     Document,
     LeaveRequest,
@@ -38,6 +39,7 @@ def db_session() -> Iterator[Session]:
             session.execute(delete(Project))
             session.execute(delete(Team))
             session.execute(delete(OrganizationMembership))
+            session.execute(delete(AuthToken))
             session.execute(delete(User))
             session.execute(delete(Organization))
             session.flush()
