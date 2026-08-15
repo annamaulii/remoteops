@@ -2,8 +2,9 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -26,6 +27,13 @@ class OrganizationRead(BaseModel):
     id: UUID
     name: str
     created_at: datetime
+
+
+class OrganizationList(BaseModel):
+    items: list[OrganizationRead]
+    total: int
+    limit: int
+    offset: int
 
 
 @router.post(
@@ -51,6 +59,27 @@ def create_organization(
 
     session.refresh(organization)
     return organization
+
+
+@router.get("", response_model=OrganizationList)
+def list_organizations(
+    session: SessionDependency,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> OrganizationList:
+    organizations = session.scalars(
+        select(Organization)
+        .order_by(Organization.name, Organization.id)
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    total = session.scalar(select(func.count()).select_from(Organization)) or 0
+    return OrganizationList(
+        items=[OrganizationRead.model_validate(item) for item in organizations],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get(
