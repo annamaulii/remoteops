@@ -28,6 +28,7 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgresql+psycopg://remoteops:remoteops@localhost:5432/remoteops
+      JWT_SECRET: test-only-secret-at-least-32-characters
     strategy:
       fail-fast: false
       matrix:
