@@ -4,8 +4,11 @@ version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
     "alembic",
+    "email-validator",
     "fastapi[standard-no-fastapi-cloud-cli]",
     "psycopg[binary]",
+    "pwdlib[argon2]",
+    "pyjwt",
     "pydantic-settings",
     "sqlalchemy>=2,<3",
 ]
