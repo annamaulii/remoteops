@@ -1,21 +1,32 @@
+import hashlib
+import json
+import re
 from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from remoteops.database import get_session
-from remoteops.models import Organization, OrganizationMembership, User
+from remoteops.models import (
+    IdempotencyRecord,
+    Organization,
+    OrganizationMembership,
+    User,
+)
 from remoteops.users import get_current_user
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 SessionDependency = Annotated[Session, Depends(get_session)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
 MemberRole = Literal["admin", "member"]
+IDEMPOTENCY_KEY_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,255}$")
 
 
 class OrganizationCreate(BaseModel):
@@ -87,8 +98,59 @@ def require_role(
     responses={409: {"description": "Organization name already exists"}},
 )
 def create_organization(
-    data: OrganizationCreate, session: SessionDependency, user: CurrentUser
-) -> Organization:
+    data: OrganizationCreate,
+    session: SessionDependency,
+    user: CurrentUser,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> Organization | JSONResponse:
+    if idempotency_key is not None and not IDEMPOTENCY_KEY_PATTERN.fullmatch(
+        idempotency_key
+    ):
+        raise HTTPException(status_code=422, detail="Invalid Idempotency-Key")
+
+    request_fingerprint = hashlib.sha256(
+        json.dumps(
+            data.model_dump(mode="json"), sort_keys=True, separators=(",", ":")
+        ).encode()
+    ).hexdigest()
+    if idempotency_key is not None:
+        key_hash = hashlib.sha256(idempotency_key.encode()).hexdigest()
+        record_id = session.scalar(
+            insert(IdempotencyRecord)
+            .values(
+                user_id=user.id,
+                method="POST",
+                path="/organizations",
+                key_hash=key_hash,
+                request_fingerprint=request_fingerprint,
+            )
+            .on_conflict_do_nothing(
+                index_elements=["user_id", "method", "path", "key_hash"]
+            )
+            .returning(IdempotencyRecord.id)
+        )
+        if record_id is None:
+            record = session.scalar(
+                select(IdempotencyRecord).where(
+                    IdempotencyRecord.user_id == user.id,
+                    IdempotencyRecord.method == "POST",
+                    IdempotencyRecord.path == "/organizations",
+                    IdempotencyRecord.key_hash == key_hash,
+                )
+            )
+            if record is None or record.request_fingerprint != request_fingerprint:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Idempotency-Key was already used with a different request",
+                )
+            status_code = record.status_code or status.HTTP_201_CREATED
+            response_body = record.response_body
+            return JSONResponse(
+                status_code=status_code,
+                content=response_body,
+                headers={"X-Idempotent-Replayed": "true"},
+            )
+
     organization = Organization(name=data.name)
     session.add(organization)
     try:
@@ -98,6 +160,19 @@ def create_organization(
                 organization_id=organization.id, user_id=user.id, role="owner"
             )
         )
+        session.flush()
+        if idempotency_key is not None:
+            response_body = OrganizationRead.model_validate(organization).model_dump(
+                mode="json"
+            )
+            session.execute(
+                update(IdempotencyRecord)
+                .where(IdempotencyRecord.id == record_id)
+                .values(
+                    status_code=status.HTTP_201_CREATED,
+                    response_body=response_body,
+                )
+            )
         session.commit()
     except IntegrityError:
         session.rollback()

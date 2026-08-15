@@ -78,6 +78,31 @@ def test_organization_memberships_table_has_expected_columns() -> None:
     } == {"valid_organization_role"}
 
 
+def test_idempotency_records_table_has_expected_columns() -> None:
+    inspector = inspect(engine)
+
+    assert {
+        column["name"] for column in inspector.get_columns("idempotency_records")
+    } == {
+        "id",
+        "user_id",
+        "method",
+        "path",
+        "key_hash",
+        "request_fingerprint",
+        "status_code",
+        "response_body",
+        "created_at",
+    }
+    assert inspector.get_pk_constraint("idempotency_records")[
+        "constrained_columns"
+    ] == ["id"]
+    assert {
+        tuple(constraint["column_names"])
+        for constraint in inspector.get_unique_constraints("idempotency_records")
+    } == {("user_id", "method", "path", "key_hash")}
+
+
 def test_core_resource_tables_have_expected_columns() -> None:
     inspector = inspect(engine)
     expected = {
