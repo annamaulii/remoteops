@@ -1,7 +1,7 @@
 """create organizations table
 
 Revision ID: 5bb597523e0e
-Revises: 
+Revises:
 Create Date: 2026-08-15 14:14:17.430014
 
 """
