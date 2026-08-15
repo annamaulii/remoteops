@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from remoteops.audit import record_audit
 from remoteops.database import get_session
 from remoteops.models import Approval, Contractor, LeaveRequest, Project, User, WorkLog
 from remoteops.organizations import get_membership, require_role
@@ -203,6 +204,14 @@ def decide_leave_request(
         note=data.note,
     )
     session.add(approval)
+    record_audit(
+        session,
+        organization_id,
+        user.id,
+        data.decision,
+        "leave_request",
+        leave.id,
+    )
     try:
         session.commit()
     except IntegrityError:

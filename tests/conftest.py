@@ -9,7 +9,9 @@ from remoteops.database import engine, get_session
 from remoteops.main import app
 from remoteops.models import (
     Approval,
+    AuditEvent,
     Contractor,
+    Document,
     LeaveRequest,
     Organization,
     OrganizationMembership,
@@ -27,6 +29,8 @@ def db_session() -> Iterator[Session]:
         with Session(
             bind=connection, join_transaction_mode="create_savepoint"
         ) as session:
+            session.execute(delete(AuditEvent))
+            session.execute(delete(Document))
             session.execute(delete(Approval))
             session.execute(delete(WorkLog))
             session.execute(delete(LeaveRequest))
