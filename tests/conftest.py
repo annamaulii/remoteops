@@ -13,6 +13,7 @@ from remoteops.models import (
     AuthToken,
     Contractor,
     Document,
+    IdempotencyRecord,
     LeaveRequest,
     Organization,
     OrganizationMembership,
@@ -39,6 +40,7 @@ def db_session() -> Iterator[Session]:
             session.execute(delete(Project))
             session.execute(delete(Team))
             session.execute(delete(OrganizationMembership))
+            session.execute(delete(IdempotencyRecord))
             session.execute(delete(AuthToken))
             session.execute(delete(User))
             session.execute(delete(Organization))
