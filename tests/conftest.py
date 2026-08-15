@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from remoteops.database import engine, get_session
 from remoteops.main import app
-from remoteops.models import Organization, User
+from remoteops.models import Organization, OrganizationMembership, User
 
 
 @pytest.fixture
@@ -17,6 +17,7 @@ def db_session() -> Iterator[Session]:
         with Session(
             bind=connection, join_transaction_mode="create_savepoint"
         ) as session:
+            session.execute(delete(OrganizationMembership))
             session.execute(delete(User))
             session.execute(delete(Organization))
             session.flush()
@@ -33,3 +34,15 @@ def client(db_session: Session) -> Iterator[TestClient]:
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def auth_client(client: TestClient) -> TestClient:
+    credentials = {"email": "owner@example.com", "password": "strong-password"}
+    client.post("/users/register", json=credentials)
+    login = client.post(
+        "/auth/login",
+        data={"username": credentials["email"], "password": credentials["password"]},
+    )
+    client.headers["Authorization"] = f"Bearer {login.json()['access_token']}"
+    return client
