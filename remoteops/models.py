@@ -37,6 +37,27 @@ class User(Base):
     )
 
 
+class AuthToken(Base):
+    __tablename__ = "auth_tokens"
+    __table_args__ = (
+        CheckConstraint(
+            "purpose IN ('refresh', 'password_reset')",
+            name="valid_auth_token_purpose",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE")
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    purpose: Mapped[str] = mapped_column(String(20))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class OrganizationMembership(Base):
     __tablename__ = "organization_memberships"
     __table_args__ = (
