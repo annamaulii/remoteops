@@ -21,6 +21,12 @@ class OrganizationCreate(BaseModel):
     name: Annotated[str, Field(min_length=1, max_length=255)]
 
 
+class OrganizationUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: Annotated[str, Field(min_length=1, max_length=255)]
+
+
 class OrganizationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -95,3 +101,52 @@ def get_organization(organization_id: UUID, session: SessionDependency) -> Organ
             detail="Organization not found",
         )
     return organization
+
+
+@router.patch(
+    "/{organization_id}",
+    response_model=OrganizationRead,
+    responses={
+        404: {"description": "Organization not found"},
+        409: {"description": "Organization name already exists"},
+    },
+)
+def update_organization(
+    organization_id: UUID, data: OrganizationUpdate, session: SessionDependency
+) -> Organization:
+    organization = session.get(Organization, organization_id)
+    if organization is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organization not found",
+        )
+
+    organization.name = data.name
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Organization name already exists",
+        ) from None
+
+    session.refresh(organization)
+    return organization
+
+
+@router.delete(
+    "/{organization_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={404: {"description": "Organization not found"}},
+)
+def delete_organization(organization_id: UUID, session: SessionDependency) -> None:
+    organization = session.get(Organization, organization_id)
+    if organization is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organization not found",
+        )
+
+    session.delete(organization)
+    session.commit()

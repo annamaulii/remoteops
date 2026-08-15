@@ -58,3 +58,41 @@ def test_list_organizations_validates_pagination(client: TestClient) -> None:
     assert client.get("/organizations?limit=0").status_code == 422
     assert client.get("/organizations?limit=101").status_code == 422
     assert client.get("/organizations?offset=-1").status_code == 422
+
+
+def test_update_organization(client: TestClient) -> None:
+    created = client.post("/organizations", json={"name": "Old name"}).json()
+
+    response = client.patch(
+        f"/organizations/{created['id']}", json={"name": "New name"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "New name"
+
+
+def test_update_organization_handles_conflicts_and_missing_ids(
+    client: TestClient,
+) -> None:
+    first = client.post("/organizations", json={"name": "First"}).json()
+    client.post("/organizations", json={"name": "Second"})
+
+    conflict = client.patch(
+        f"/organizations/{first['id']}", json={"name": "Second"}
+    )
+    missing = client.patch(
+        f"/organizations/{uuid4()}", json={"name": "Missing"}
+    )
+
+    assert conflict.status_code == 409
+    assert missing.status_code == 404
+
+
+def test_delete_organization(client: TestClient) -> None:
+    created = client.post("/organizations", json={"name": "Temporary"}).json()
+
+    response = client.delete(f"/organizations/{created['id']}")
+
+    assert response.status_code == 204
+    assert client.get(f"/organizations/{created['id']}").status_code == 404
+    assert client.delete(f"/organizations/{uuid4()}").status_code == 404
