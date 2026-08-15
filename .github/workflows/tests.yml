@@ -48,5 +48,8 @@ jobs:
       - name: Install project
         run: python -m pip install -e ".[dev]"
 
+      - name: Apply database migrations
+        run: python -m alembic upgrade head
+
       - name: Run tests
         run: python -m pytest
