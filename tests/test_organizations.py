@@ -25,14 +25,14 @@ def test_create_organization_rejects_duplicate_name(auth_client: TestClient) -> 
 
     assert first_response.status_code == 201
     assert response.status_code == 409
-    assert response.json() == {"detail": "Organization name already exists"}
+    assert response.json()["error"]["message"] == "Organization name already exists"
 
 
 def test_get_organization_reports_missing_id(auth_client: TestClient) -> None:
     response = auth_client.get(f"/organizations/{uuid4()}")
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "Organization not found"}
+    assert response.json()["error"]["message"] == "Organization not found"
 
 
 def test_create_organization_validates_name(auth_client: TestClient) -> None:
