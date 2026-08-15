@@ -1,10 +1,11 @@
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -96,6 +97,77 @@ class Project(Base):
     )
     name: Mapped[str] = mapped_column(String(255))
     description: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class WorkLog(Base):
+    __tablename__ = "work_logs"
+    __table_args__ = (CheckConstraint("minutes > 0", name="positive_work_minutes"),)
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE")
+    )
+    contractor_id: Mapped[UUID] = mapped_column(
+        ForeignKey("contractors.id", ondelete="CASCADE")
+    )
+    project_id: Mapped[UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE")
+    )
+    work_date: Mapped[date]
+    minutes: Mapped[int] = mapped_column(Integer)
+    description: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class LeaveRequest(Base):
+    __tablename__ = "leave_requests"
+    __table_args__ = (
+        CheckConstraint("end_date >= start_date", name="valid_leave_dates"),
+        CheckConstraint(
+            "status IN ('pending', 'approved', 'rejected')",
+            name="valid_leave_status",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE")
+    )
+    contractor_id: Mapped[UUID] = mapped_column(
+        ForeignKey("contractors.id", ondelete="CASCADE")
+    )
+    start_date: Mapped[date]
+    end_date: Mapped[date]
+    reason: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class Approval(Base):
+    __tablename__ = "approvals"
+    __table_args__ = (
+        CheckConstraint(
+            "decision IN ('approved', 'rejected')",
+            name="valid_approval_decision",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    leave_request_id: Mapped[UUID] = mapped_column(
+        ForeignKey("leave_requests.id", ondelete="CASCADE"), unique=True
+    )
+    reviewer_user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT")
+    )
+    decision: Mapped[str] = mapped_column(String(20))
+    note: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
