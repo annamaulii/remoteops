@@ -7,7 +7,14 @@ from sqlalchemy.orm import Session
 
 from remoteops.database import engine, get_session
 from remoteops.main import app
-from remoteops.models import Organization, OrganizationMembership, User
+from remoteops.models import (
+    Contractor,
+    Organization,
+    OrganizationMembership,
+    Project,
+    Team,
+    User,
+)
 
 
 @pytest.fixture
@@ -17,6 +24,9 @@ def db_session() -> Iterator[Session]:
         with Session(
             bind=connection, join_transaction_mode="create_savepoint"
         ) as session:
+            session.execute(delete(Contractor))
+            session.execute(delete(Project))
+            session.execute(delete(Team))
             session.execute(delete(OrganizationMembership))
             session.execute(delete(User))
             session.execute(delete(Organization))
