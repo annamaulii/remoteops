@@ -8,12 +8,15 @@ from sqlalchemy.orm import Session
 from remoteops.database import engine, get_session
 from remoteops.main import app
 from remoteops.models import (
+    Approval,
     Contractor,
+    LeaveRequest,
     Organization,
     OrganizationMembership,
     Project,
     Team,
     User,
+    WorkLog,
 )
 
 
@@ -24,6 +27,9 @@ def db_session() -> Iterator[Session]:
         with Session(
             bind=connection, join_transaction_mode="create_savepoint"
         ) as session:
+            session.execute(delete(Approval))
+            session.execute(delete(WorkLog))
+            session.execute(delete(LeaveRequest))
             session.execute(delete(Contractor))
             session.execute(delete(Project))
             session.execute(delete(Team))
