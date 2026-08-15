@@ -2,10 +2,12 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from remoteops.database import engine, get_session
 from remoteops.main import app
+from remoteops.models import Organization
 
 
 @pytest.fixture
@@ -15,6 +17,8 @@ def db_session() -> Iterator[Session]:
         with Session(
             bind=connection, join_transaction_mode="create_savepoint"
         ) as session:
+            session.execute(delete(Organization))
+            session.flush()
             yield session
         transaction.rollback()
 

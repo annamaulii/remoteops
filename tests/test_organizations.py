@@ -38,3 +38,23 @@ def test_get_organization_reports_missing_id(client: TestClient) -> None:
 def test_create_organization_validates_name(client: TestClient) -> None:
     assert client.post("/organizations", json={"name": "   "}).status_code == 422
     assert client.post("/organizations", json={"name": "a" * 256}).status_code == 422
+
+
+def test_list_organizations_paginates(client: TestClient) -> None:
+    for name in ("Alpha", "Beta", "Gamma"):
+        assert client.post("/organizations", json={"name": name}).status_code == 201
+
+    response = client.get("/organizations?limit=2&offset=1")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["name"] for item in body["items"]] == ["Beta", "Gamma"]
+    assert body["total"] == 3
+    assert body["limit"] == 2
+    assert body["offset"] == 1
+
+
+def test_list_organizations_validates_pagination(client: TestClient) -> None:
+    assert client.get("/organizations?limit=0").status_code == 422
+    assert client.get("/organizations?limit=101").status_code == 422
+    assert client.get("/organizations?offset=-1").status_code == 422
