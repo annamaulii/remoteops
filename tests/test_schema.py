@@ -81,3 +81,26 @@ def test_core_resource_tables_have_expected_columns() -> None:
         assert {column["name"] for column in inspector.get_columns(table)} == columns
         assert inspector.get_pk_constraint(table)["constrained_columns"] == ["id"]
         assert inspector.get_foreign_keys(table)[0]["referred_table"] == "organizations"
+
+
+def test_document_and_audit_tables_have_expected_columns() -> None:
+    inspector = inspect(engine)
+
+    assert {column["name"] for column in inspector.get_columns("documents")} == {
+        "id",
+        "organization_id",
+        "created_by_user_id",
+        "name",
+        "content_type",
+        "size_bytes",
+        "created_at",
+    }
+    assert {column["name"] for column in inspector.get_columns("audit_events")} == {
+        "id",
+        "organization_id",
+        "actor_user_id",
+        "action",
+        "entity_type",
+        "entity_id",
+        "created_at",
+    }
