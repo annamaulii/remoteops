@@ -1,9 +1,20 @@
 from collections.abc import Iterator
+import os
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
+
+os.environ.setdefault(
+    "DATABASE_URL",
+    "postgresql+psycopg://remoteops:remoteops@localhost:5432/remoteops",
+)
+os.environ.setdefault("JWT_SECRET", "test-only-secret-at-least-32-characters")
+os.environ.setdefault(
+    "WEBHOOK_SIGNING_SECRET", "test-webhook-secret-at-least-32-characters"
+)
+os.environ.setdefault("WEBHOOK_ALLOWED_HOSTS", "webhooks.example.com")
 
 from remoteops.database import engine, get_session
 from remoteops.main import app
@@ -21,6 +32,9 @@ from remoteops.models import (
     Team,
     User,
     WorkLog,
+    WebhookAttempt,
+    WebhookDelivery,
+    WebhookSubscription,
 )
 
 
@@ -32,6 +46,9 @@ def db_session() -> Iterator[Session]:
             bind=connection, join_transaction_mode="create_savepoint"
         ) as session:
             session.execute(delete(AuditEvent))
+            session.execute(delete(WebhookAttempt))
+            session.execute(delete(WebhookDelivery))
+            session.execute(delete(WebhookSubscription))
             session.execute(delete(Document))
             session.execute(delete(Approval))
             session.execute(delete(WorkLog))

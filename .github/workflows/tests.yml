@@ -29,6 +29,8 @@ jobs:
     env:
       DATABASE_URL: postgresql+psycopg://remoteops:remoteops@localhost:5432/remoteops
       JWT_SECRET: test-only-secret-at-least-32-characters
+      WEBHOOK_SIGNING_SECRET: test-webhook-secret-at-least-32-characters
+      WEBHOOK_ALLOWED_HOSTS: webhooks.example.com
     strategy:
       fail-fast: false
       matrix:

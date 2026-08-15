@@ -14,6 +14,7 @@ from remoteops.models import Approval, Contractor, LeaveRequest, Project, User, 
 from remoteops.organizations import get_membership, require_role
 from remoteops.resources import get_resource
 from remoteops.users import get_current_user
+from remoteops.webhooks import enqueue_event
 
 router = APIRouter(prefix="/organizations", tags=["workflows"])
 SessionDependency = Annotated[Session, Depends(get_session)]
@@ -211,6 +212,15 @@ def decide_leave_request(
         data.decision,
         "leave_request",
         leave.id,
+    )
+    enqueue_event(
+        session,
+        organization_id,
+        "leave_request.decided",
+        {
+            "leave_request_id": str(leave.id),
+            "decision": data.decision,
+        },
     )
     try:
         session.commit()

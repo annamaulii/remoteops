@@ -150,3 +150,22 @@ def test_document_and_audit_tables_have_expected_columns() -> None:
         "entity_id",
         "created_at",
     }
+
+
+def test_webhook_tables_have_expected_columns() -> None:
+    inspector = inspect(engine)
+
+    assert {column["name"] for column in inspector.get_columns("webhook_subscriptions")} == {
+        "id", "organization_id", "url", "event", "created_at"
+    }
+    assert {column["name"] for column in inspector.get_columns("webhook_deliveries")} == {
+        "id", "subscription_id", "event", "payload", "status",
+        "attempt_count", "next_attempt_at", "created_at", "updated_at",
+    }
+    assert {column["name"] for column in inspector.get_columns("webhook_attempts")} == {
+        "id", "delivery_id", "attempt_number", "status_code", "error_code",
+        "attempted_at",
+    }
+    assert "ix_webhook_deliveries_due" in {
+        index["name"] for index in inspector.get_indexes("webhook_deliveries")
+    }

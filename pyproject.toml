@@ -6,6 +6,7 @@ dependencies = [
     "alembic",
     "email-validator",
     "fastapi[standard-no-fastapi-cloud-cli]",
+    "httpx",
     "psycopg[binary]",
     "pwdlib[argon2]",
     "pyjwt",
@@ -15,7 +16,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "httpx2",
     "pytest",
 ]
 
