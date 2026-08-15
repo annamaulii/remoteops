@@ -6,7 +6,7 @@ from sqlalchemy import pool
 from alembic import context
 from remoteops.config import settings
 from remoteops.database import Base
-from remoteops.models import Organization  # noqa: F401
+from remoteops import models  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
