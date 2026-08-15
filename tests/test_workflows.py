@@ -77,7 +77,7 @@ def test_leave_request_approval_is_transactional(auth_client: TestClient) -> Non
         json={"decision": "rejected"},
     )
     listed = auth_client.get(
-        f"/organizations/{organization_id}/leave-requests"
+        f"/organizations/{organization_id}/leave-requests?limit=1&offset=0"
     )
 
     assert leave.status_code == 201
@@ -85,6 +85,17 @@ def test_leave_request_approval_is_transactional(auth_client: TestClient) -> Non
     assert approval.json()["decision"] == "approved"
     assert duplicate.status_code == 409
     assert listed.json()[0]["status"] == "approved"
+
+
+def test_leave_request_pagination_is_validated(auth_client: TestClient) -> None:
+    organization_id, _, _ = create_context(auth_client)
+
+    assert auth_client.get(
+        f"/organizations/{organization_id}/leave-requests?limit=0"
+    ).status_code == 422
+    assert auth_client.get(
+        f"/organizations/{organization_id}/leave-requests?offset=-1"
+    ).status_code == 422
 
 
 def test_rejects_invalid_leave_dates(auth_client: TestClient) -> None:

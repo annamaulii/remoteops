@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from remoteops.database import get_session
@@ -163,6 +164,8 @@ def list_leave_requests(
     organization_id: UUID,
     session: SessionDependency,
     user: CurrentUser,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[LeaveRequest]:
     get_membership(organization_id, user.id, session)
     return list(
@@ -170,6 +173,8 @@ def list_leave_requests(
             select(LeaveRequest)
             .where(LeaveRequest.organization_id == organization_id)
             .order_by(LeaveRequest.created_at.desc(), LeaveRequest.id)
+            .limit(limit)
+            .offset(offset)
         ).all()
     )
 
@@ -198,6 +203,12 @@ def decide_leave_request(
         note=data.note,
     )
     session.add(approval)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(
+            status_code=409, detail="Leave request already decided"
+        ) from None
     session.refresh(approval)
     return approval
