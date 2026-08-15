@@ -5,6 +5,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     JSON,
     String,
@@ -250,5 +251,65 @@ class AuditEvent(Base):
     entity_type: Mapped[str] = mapped_column(String(50))
     entity_id: Mapped[UUID]
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class WebhookSubscription(Base):
+    __tablename__ = "webhook_subscriptions"
+    __table_args__ = (UniqueConstraint("organization_id", "url", "event"),)
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE")
+    )
+    url: Mapped[str] = mapped_column(String(2048))
+    event: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class WebhookDelivery(Base):
+    __tablename__ = "webhook_deliveries"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'retrying', 'succeeded', 'failed')",
+            name="valid_webhook_delivery_status",
+        ),
+        Index("ix_webhook_deliveries_due", "status", "next_attempt_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    subscription_id: Mapped[UUID] = mapped_column(
+        ForeignKey("webhook_subscriptions.id", ondelete="CASCADE")
+    )
+    event: Mapped[str] = mapped_column(String(100))
+    payload: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0)
+    next_attempt_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class WebhookAttempt(Base):
+    __tablename__ = "webhook_attempts"
+    __table_args__ = (UniqueConstraint("delivery_id", "attempt_number"),)
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    delivery_id: Mapped[UUID] = mapped_column(
+        ForeignKey("webhook_deliveries.id", ondelete="CASCADE")
+    )
+    attempt_number: Mapped[int] = mapped_column(Integer)
+    status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    attempted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

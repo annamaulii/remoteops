@@ -11,6 +11,7 @@ from remoteops.reliability import configure_reliability
 from remoteops.resources import router as resources_router
 from remoteops.users import router as users_router
 from remoteops.workflows import router as workflows_router
+from remoteops.webhooks import router as webhooks_router
 
 app = FastAPI(title="RemoteOps", version="0.1.0")
 configure_reliability(
@@ -22,6 +23,7 @@ app.include_router(organizations_router)
 app.include_router(resources_router)
 app.include_router(users_router)
 app.include_router(workflows_router)
+app.include_router(webhooks_router)
 
 
 @app.get("/health")
