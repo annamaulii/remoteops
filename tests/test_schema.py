@@ -32,3 +32,26 @@ def test_users_table_has_expected_columns() -> None:
         tuple(constraint["column_names"])
         for constraint in inspector.get_unique_constraints("users")
     } == {("email",)}
+
+
+def test_organization_memberships_table_has_expected_columns() -> None:
+    inspector = inspect(engine)
+    columns = inspector.get_columns("organization_memberships")
+
+    assert {column["name"] for column in columns} == {
+        "organization_id",
+        "user_id",
+        "role",
+        "created_at",
+    }
+    assert set(
+        inspector.get_pk_constraint("organization_memberships")[
+            "constrained_columns"
+        ]
+    ) == {"organization_id", "user_id"}
+    assert {
+        constraint["name"]
+        for constraint in inspector.get_check_constraints(
+            "organization_memberships"
+        )
+    } == {"valid_organization_role"}
