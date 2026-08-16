@@ -3,12 +3,14 @@ from concurrent.futures import TimeoutError as FutureTimeoutError
 from datetime import UTC, datetime, timedelta
 from threading import Event
 
+import jwt
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from remoteops.config import settings
 from remoteops.database import SessionFactory
 from remoteops.models import AuthToken, User
 from remoteops.users import (
@@ -91,6 +93,26 @@ def test_rejects_invalid_login_and_token(client: TestClient) -> None:
     assert current_user.status_code == 401
 
 
+def test_rejects_expired_access_token(client: TestClient, db_session: Session) -> None:
+    client.post(
+        "/users/register",
+        json={"email": "anna@example.com", "password": "strong-password"},
+    )
+    user = db_session.scalar(select(User).where(User.email == "anna@example.com"))
+    assert user is not None
+    expired_token = jwt.encode(
+        {"sub": str(user.id), "exp": datetime.now(UTC) - timedelta(seconds=1)},
+        settings.jwt_secret.get_secret_value(),
+        algorithm="HS256",
+    )
+
+    response = client.get(
+        "/users/me", headers={"Authorization": f"Bearer {expired_token}"}
+    )
+
+    assert response.status_code == 401
+
+
 def test_refresh_rotates_refresh_token(client: TestClient, db_session: Session) -> None:
     client.post(
         "/users/register",
@@ -120,6 +142,31 @@ def test_refresh_rotates_refresh_token(client: TestClient, db_session: Session) 
     assert stored_token is not None
     assert stored_token.token_hash == hash_auth_token(refresh.json()["refresh_token"])
     assert stored_token.token_hash != refresh.json()["refresh_token"]
+
+
+def test_rejects_expired_refresh_token(client: TestClient, db_session: Session) -> None:
+    client.post(
+        "/users/register",
+        json={"email": "anna@example.com", "password": "strong-password"},
+    )
+    login = client.post(
+        "/auth/login",
+        data={"username": "anna@example.com", "password": "strong-password"},
+    )
+    stored_token = db_session.scalar(
+        select(AuthToken).where(AuthToken.purpose == "refresh")
+    )
+    assert stored_token is not None
+    stored_token.expires_at = datetime.now(UTC) - timedelta(seconds=1)
+    db_session.commit()
+
+    response = client.post(
+        "/auth/refresh",
+        json={"refresh_token": login.json()["refresh_token"]},
+    )
+
+    assert response.status_code == 401
+    assert db_session.get(AuthToken, stored_token.id) is None
 
 
 def test_logout_revokes_refresh_token(client: TestClient) -> None:
