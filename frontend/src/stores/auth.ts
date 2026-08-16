@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { login as apiLogin, logout as apiLogout, me as apiMe, refresh as apiRefresh } from '../api/auth'
+import { ApiError } from '../api/client'
 import type { UserRead } from '../api/types'
 
 // Token handling: the access token lives only in memory (Pinia state) and is
@@ -71,6 +72,27 @@ export const useAuthStore = defineStore('auth', {
         this.user = await apiMe(token.access_token)
       } catch {
         this.clearTokens()
+      }
+    },
+
+    /**
+     * Run an authenticated call, retrying once via a session refresh if the
+     * access token expired mid-session. Clears the session if that also fails.
+     */
+    async withAuth<T>(fn: (token: string) => Promise<T>): Promise<T> {
+      if (!this.accessToken) {
+        throw new ApiError(401, 'unauthorized', 'Not authenticated', '')
+      }
+      try {
+        return await fn(this.accessToken)
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401 && this.refreshToken) {
+          await this.restoreSession()
+          if (this.accessToken) {
+            return await fn(this.accessToken)
+          }
+        }
+        throw error
       }
     },
   },
