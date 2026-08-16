@@ -4,7 +4,7 @@ import math
 import re
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
@@ -56,7 +56,7 @@ def error_response(
     code: str,
     message: str,
     request_id: str,
-    headers: dict[str, str] | None = None,
+    headers: Mapping[str, str] | None = None,
 ) -> JSONResponse:
     """Build the API's standard error response."""
     return JSONResponse(
@@ -127,9 +127,7 @@ def configure_reliability(
                     "method": request.method,
                     "path": request.url.path,
                     "status": response.status_code,
-                    "duration_ms": round(
-                        (time.perf_counter() - started_at) * 1000, 2
-                    ),
+                    "duration_ms": round((time.perf_counter() - started_at) * 1000, 2),
                     "request_id": request_id,
                 },
                 separators=(",", ":"),

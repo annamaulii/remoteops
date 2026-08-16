@@ -29,9 +29,7 @@ def test_request_id_is_returned_and_logged(
 
 
 def test_unsafe_request_id_is_replaced(client: TestClient) -> None:
-    response = client.get(
-        "/health", headers={"X-Request-ID": "unsafe request-id"}
-    )
+    response = client.get("/health", headers={"X-Request-ID": "unsafe request-id"})
 
     assert response.headers["X-Request-ID"] != "unsafe request-id"
     assert len(response.headers["X-Request-ID"]) == 36

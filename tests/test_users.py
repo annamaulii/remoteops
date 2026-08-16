@@ -1,4 +1,5 @@
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from datetime import UTC, datetime, timedelta
 from threading import Event
 
@@ -12,10 +13,10 @@ from remoteops.database import SessionFactory
 from remoteops.models import AuthToken, User
 from remoteops.users import (
     RefreshTokenRequest,
-    create_refresh_token,
     create_password_reset_token,
-    hash_auth_token,
+    create_refresh_token,
     get_valid_auth_token,
+    hash_auth_token,
     password_hash,
     refresh_access_token,
 )
@@ -43,10 +44,13 @@ def test_rejects_duplicate_email_and_invalid_password(client: TestClient) -> Non
     assert client.post("/users/register", json=data).status_code == 201
 
     assert client.post("/users/register", json=data).status_code == 409
-    assert client.post(
-        "/users/register",
-        json={"email": "valid@example.com", "password": "short"},
-    ).status_code == 422
+    assert (
+        client.post(
+            "/users/register",
+            json={"email": "valid@example.com", "password": "short"},
+        ).status_code
+        == 422
+    )
 
 
 def test_logs_in_and_reads_current_user(client: TestClient) -> None:
@@ -60,9 +64,7 @@ def test_logs_in_and_reads_current_user(client: TestClient) -> None:
         data={"username": "ANNA@example.com", "password": "strong-password"},
     )
     token = login.json()["access_token"]
-    response = client.get(
-        "/users/me", headers={"Authorization": f"Bearer {token}"}
-    )
+    response = client.get("/users/me", headers={"Authorization": f"Bearer {token}"})
 
     assert login.status_code == 200
     assert login.json()["token_type"] == "bearer"
@@ -89,9 +91,7 @@ def test_rejects_invalid_login_and_token(client: TestClient) -> None:
     assert current_user.status_code == 401
 
 
-def test_refresh_rotates_refresh_token(
-    client: TestClient, db_session: Session
-) -> None:
+def test_refresh_rotates_refresh_token(client: TestClient, db_session: Session) -> None:
     client.post(
         "/users/register",
         json={"email": "anna@example.com", "password": "strong-password"},

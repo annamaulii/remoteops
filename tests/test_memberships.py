@@ -21,9 +21,7 @@ def login_headers(client: TestClient, email: str) -> dict[str, str]:
 
 
 def test_creator_becomes_owner(auth_client: TestClient) -> None:
-    organization = auth_client.post(
-        "/organizations", json={"name": "Acme"}
-    ).json()
+    organization = auth_client.post("/organizations", json={"name": "Acme"}).json()
 
     response = auth_client.get(f"/organizations/{organization['id']}/members")
 
@@ -33,9 +31,7 @@ def test_creator_becomes_owner(auth_client: TestClient) -> None:
 
 
 def test_member_access_is_scoped_and_read_only(auth_client: TestClient) -> None:
-    organization = auth_client.post(
-        "/organizations", json={"name": "Acme"}
-    ).json()
+    organization = auth_client.post("/organizations", json={"name": "Acme"}).json()
     register_user(auth_client, "member@example.com")
     added = auth_client.post(
         f"/organizations/{organization['id']}/members",
@@ -58,9 +54,7 @@ def test_member_access_is_scoped_and_read_only(auth_client: TestClient) -> None:
 
 
 def test_owner_manages_member_roles(auth_client: TestClient) -> None:
-    organization = auth_client.post(
-        "/organizations", json={"name": "Acme"}
-    ).json()
+    organization = auth_client.post("/organizations", json={"name": "Acme"}).json()
     user = register_user(auth_client, "admin@example.com")
     auth_client.post(
         f"/organizations/{organization['id']}/members",
@@ -86,9 +80,7 @@ def test_owner_manages_member_roles(auth_client: TestClient) -> None:
 
 
 def test_non_member_cannot_discover_organization(auth_client: TestClient) -> None:
-    organization = auth_client.post(
-        "/organizations", json={"name": "Private"}
-    ).json()
+    organization = auth_client.post("/organizations", json={"name": "Private"}).json()
     register_user(auth_client, "outsider@example.com")
 
     response = auth_client.get(

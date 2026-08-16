@@ -86,9 +86,7 @@ class ApprovalRead(BaseModel):
     created_at: datetime
 
 
-def get_leave(
-    organization_id: UUID, leave_id: UUID, session: Session
-) -> LeaveRequest:
+def get_leave(organization_id: UUID, leave_id: UUID, session: Session) -> LeaveRequest:
     leave = session.scalar(
         select(LeaveRequest).where(
             LeaveRequest.id == leave_id,
@@ -100,9 +98,7 @@ def get_leave(
     return leave
 
 
-def get_work_log(
-    organization_id: UUID, work_log_id: UUID, session: Session
-) -> WorkLog:
+def get_work_log(organization_id: UUID, work_log_id: UUID, session: Session) -> WorkLog:
     work_log = session.scalar(
         select(WorkLog).where(
             WorkLog.id == work_log_id,
@@ -218,9 +214,7 @@ def create_leave_request(
     return leave
 
 
-@router.get(
-    "/{organization_id}/leave-requests", response_model=list[LeaveRead]
-)
+@router.get("/{organization_id}/leave-requests", response_model=list[LeaveRead])
 def list_leave_requests(
     organization_id: UUID,
     session: SessionDependency,

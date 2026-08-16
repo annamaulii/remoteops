@@ -2,7 +2,7 @@ import hashlib
 import hmac
 import json
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 from uuid import UUID
@@ -149,9 +149,7 @@ def create_subscription(
     )
 
 
-@router.get(
-    "/{organization_id}/webhooks", response_model=list[SubscriptionRead]
-)
+@router.get("/{organization_id}/webhooks", response_model=list[SubscriptionRead])
 def list_subscriptions(
     organization_id: UUID, session: SessionDependency, user: CurrentUser
 ) -> list[WebhookSubscription]:
@@ -188,9 +186,7 @@ def delete_subscription(
     session.commit()
 
 
-@router.get(
-    "/{organization_id}/webhook-deliveries", response_model=list[DeliveryRead]
-)
+@router.get("/{organization_id}/webhook-deliveries", response_model=list[DeliveryRead])
 def list_deliveries(
     organization_id: UUID,
     session: SessionDependency,
@@ -258,7 +254,7 @@ def process_due_deliveries(
     now: datetime | None = None,
     limit: int = 20,
 ) -> int:
-    current_time = now or datetime.now(timezone.utc)
+    current_time = now or datetime.now(UTC)
     deliveries = session.scalars(
         select(WebhookDelivery)
         .where(

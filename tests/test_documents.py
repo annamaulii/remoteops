@@ -4,9 +4,9 @@ from fastapi.testclient import TestClient
 def test_document_crud_creates_immutable_audit_history(
     auth_client: TestClient,
 ) -> None:
-    organization_id = auth_client.post(
-        "/organizations", json={"name": "Acme"}
-    ).json()["id"]
+    organization_id = auth_client.post("/organizations", json={"name": "Acme"}).json()[
+        "id"
+    ]
     created = auth_client.post(
         f"/organizations/{organization_id}/documents",
         json={
@@ -30,9 +30,7 @@ def test_document_crud_creates_immutable_audit_history(
     deleted = auth_client.delete(
         f"/organizations/{organization_id}/documents/{document_id}"
     )
-    audit = auth_client.get(
-        f"/organizations/{organization_id}/audit-events"
-    ).json()
+    audit = auth_client.get(f"/organizations/{organization_id}/audit-events").json()
 
     assert created.status_code == 201
     assert listed["total"] == 1
@@ -47,45 +45,57 @@ def test_document_crud_creates_immutable_audit_history(
 
 
 def test_document_metadata_is_validated(auth_client: TestClient) -> None:
-    organization_id = auth_client.post(
-        "/organizations", json={"name": "Acme"}
-    ).json()["id"]
+    organization_id = auth_client.post("/organizations", json={"name": "Acme"}).json()[
+        "id"
+    ]
 
-    assert auth_client.post(
-        f"/organizations/{organization_id}/documents",
-        json={"name": "file", "content_type": "text/plain", "size_bytes": -1},
-    ).status_code == 422
-    assert auth_client.post(
-        f"/organizations/{organization_id}/documents",
-        json={
-            "name": "file",
-            "content_type": "text/plain",
-            "size_bytes": 1,
-            "storage_key": "must-not-be-accepted",
-        },
-    ).status_code == 422
+    assert (
+        auth_client.post(
+            f"/organizations/{organization_id}/documents",
+            json={"name": "file", "content_type": "text/plain", "size_bytes": -1},
+        ).status_code
+        == 422
+    )
+    assert (
+        auth_client.post(
+            f"/organizations/{organization_id}/documents",
+            json={
+                "name": "file",
+                "content_type": "text/plain",
+                "size_bytes": 1,
+                "storage_key": "must-not-be-accepted",
+            },
+        ).status_code
+        == 422
+    )
 
 
 def test_document_names_are_unique(auth_client: TestClient) -> None:
-    organization_id = auth_client.post(
-        "/organizations", json={"name": "Acme"}
-    ).json()["id"]
+    organization_id = auth_client.post("/organizations", json={"name": "Acme"}).json()[
+        "id"
+    ]
     data = {"name": "file.txt", "content_type": "text/plain", "size_bytes": 1}
 
-    assert auth_client.post(
-        f"/organizations/{organization_id}/documents", json=data
-    ).status_code == 201
-    assert auth_client.post(
-        f"/organizations/{organization_id}/documents", json=data
-    ).status_code == 409
+    assert (
+        auth_client.post(
+            f"/organizations/{organization_id}/documents", json=data
+        ).status_code
+        == 201
+    )
+    assert (
+        auth_client.post(
+            f"/organizations/{organization_id}/documents", json=data
+        ).status_code
+        == 409
+    )
 
 
 def test_member_can_read_documents_but_not_audit_events(
     auth_client: TestClient,
 ) -> None:
-    organization_id = auth_client.post(
-        "/organizations", json={"name": "Acme"}
-    ).json()["id"]
+    organization_id = auth_client.post("/organizations", json={"name": "Acme"}).json()[
+        "id"
+    ]
     credentials = {"email": "member@example.com", "password": "strong-password"}
     member = auth_client.post("/users/register", json=credentials).json()
     auth_client.post(
@@ -98,24 +108,33 @@ def test_member_can_read_documents_but_not_audit_events(
     )
     headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
 
-    assert auth_client.get(
-        f"/organizations/{organization_id}/documents", headers=headers
-    ).status_code == 200
-    assert auth_client.post(
-        f"/organizations/{organization_id}/documents",
-        json={"name": "file", "content_type": "text/plain", "size_bytes": 1},
-        headers=headers,
-    ).status_code == 403
-    assert auth_client.get(
-        f"/organizations/{organization_id}/audit-events", headers=headers
-    ).status_code == 403
+    assert (
+        auth_client.get(
+            f"/organizations/{organization_id}/documents", headers=headers
+        ).status_code
+        == 200
+    )
+    assert (
+        auth_client.post(
+            f"/organizations/{organization_id}/documents",
+            json={"name": "file", "content_type": "text/plain", "size_bytes": 1},
+            headers=headers,
+        ).status_code
+        == 403
+    )
+    assert (
+        auth_client.get(
+            f"/organizations/{organization_id}/audit-events", headers=headers
+        ).status_code
+        == 403
+    )
     assert member["email"] == credentials["email"]
 
 
 def test_leave_decision_creates_audit_event(auth_client: TestClient) -> None:
-    organization_id = auth_client.post(
-        "/organizations", json={"name": "Acme"}
-    ).json()["id"]
+    organization_id = auth_client.post("/organizations", json={"name": "Acme"}).json()[
+        "id"
+    ]
     contractor_id = auth_client.post(
         f"/organizations/{organization_id}/contractors",
         json={"name": "Ada", "email": "ada@example.com"},
@@ -133,9 +152,7 @@ def test_leave_decision_creates_audit_event(auth_client: TestClient) -> None:
         f"/organizations/{organization_id}/leave-requests/{leave_id}/decision",
         json={"decision": "approved"},
     )
-    audit = auth_client.get(
-        f"/organizations/{organization_id}/audit-events"
-    ).json()
+    audit = auth_client.get(f"/organizations/{organization_id}/audit-events").json()
 
     assert audit["total"] == 1
     assert audit["items"][0]["action"] == "approved"
@@ -160,14 +177,23 @@ def test_document_and_audit_data_are_tenant_isolated(
     )
     headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
 
-    assert auth_client.get(
-        f"/organizations/{organization_id}/documents/{document_id}", headers=headers
-    ).status_code == 404
-    assert auth_client.patch(
-        f"/organizations/{organization_id}/documents/{document_id}",
-        json={"name": "stolen", "content_type": "text/plain", "size_bytes": 1},
-        headers=headers,
-    ).status_code == 404
-    assert auth_client.get(
-        f"/organizations/{organization_id}/audit-events", headers=headers
-    ).status_code == 404
+    assert (
+        auth_client.get(
+            f"/organizations/{organization_id}/documents/{document_id}", headers=headers
+        ).status_code
+        == 404
+    )
+    assert (
+        auth_client.patch(
+            f"/organizations/{organization_id}/documents/{document_id}",
+            json={"name": "stolen", "content_type": "text/plain", "size_bytes": 1},
+            headers=headers,
+        ).status_code
+        == 404
+    )
+    assert (
+        auth_client.get(
+            f"/organizations/{organization_id}/audit-events", headers=headers
+        ).status_code
+        == 404
+    )

@@ -8,8 +8,8 @@ import jwt
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jwt import InvalidTokenError
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from pwdlib import PasswordHash
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
