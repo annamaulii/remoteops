@@ -146,7 +146,13 @@ class Project(Base):
 
 class WorkLog(Base):
     __tablename__ = "work_logs"
-    __table_args__ = (CheckConstraint("minutes > 0", name="positive_work_minutes"),)
+    __table_args__ = (
+        CheckConstraint("minutes > 0", name="positive_work_minutes"),
+        CheckConstraint(
+            "status IN ('submitted', 'approved', 'rejected')",
+            name="valid_work_log_status",
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     organization_id: Mapped[UUID] = mapped_column(
@@ -161,6 +167,7 @@ class WorkLog(Base):
     work_date: Mapped[date]
     minutes: Mapped[int] = mapped_column(Integer)
     description: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="submitted")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -199,11 +206,22 @@ class Approval(Base):
             "decision IN ('approved', 'rejected')",
             name="valid_approval_decision",
         ),
+        CheckConstraint(
+            "(leave_request_id IS NOT NULL) <> (work_log_id IS NOT NULL)",
+            name="approval_target_exclusive",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    leave_request_id: Mapped[UUID] = mapped_column(
-        ForeignKey("leave_requests.id", ondelete="CASCADE"), unique=True
+    leave_request_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("leave_requests.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=True,
+    )
+    work_log_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("work_logs.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=True,
     )
     reviewer_user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id", ondelete="RESTRICT")
