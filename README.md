@@ -52,4 +52,7 @@ python -m pip install -e ".[dev]"
 docker compose up -d postgres
 alembic upgrade head
 pytest
+ruff check remoteops tests migrations/env.py
+ruff format --check remoteops tests migrations/env.py
+mypy remoteops
 ```

@@ -1,5 +1,5 @@
-from collections.abc import Iterator
 import os
+from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -31,10 +31,10 @@ from remoteops.models import (
     Project,
     Team,
     User,
-    WorkLog,
     WebhookAttempt,
     WebhookDelivery,
     WebhookSubscription,
+    WorkLog,
 )
 
 

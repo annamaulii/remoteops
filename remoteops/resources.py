@@ -118,9 +118,9 @@ def list_resources(
             .offset(offset)
         ).all()
     )
-    total = session.scalar(
-        select(func.count()).select_from(model).where(condition)
-    ) or 0
+    total = (
+        session.scalar(select(func.count()).select_from(model).where(condition)) or 0
+    )
     return items, total
 
 
@@ -242,9 +242,7 @@ def list_contractors(
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> ContractorPage:
     get_membership(organization_id, user.id, session)
-    items, total = list_resources(
-        Contractor, organization_id, session, limit, offset
-    )
+    items, total = list_resources(Contractor, organization_id, session, limit, offset)
     return ContractorPage(
         items=[ContractorRead.model_validate(item) for item in items],
         total=total,
@@ -361,9 +359,7 @@ def get_project(
     return get_resource(Project, organization_id, project_id, session, "Project")
 
 
-@router.patch(
-    "/{organization_id}/projects/{project_id}", response_model=ProjectRead
-)
+@router.patch("/{organization_id}/projects/{project_id}", response_model=ProjectRead)
 def update_project(
     organization_id: UUID,
     project_id: UUID,
@@ -372,9 +368,7 @@ def update_project(
     user: CurrentUser,
 ) -> Project:
     require_role(organization_id, user.id, session, {"owner", "admin"})
-    project = get_resource(
-        Project, organization_id, project_id, session, "Project"
-    )
+    project = get_resource(Project, organization_id, project_id, session, "Project")
     project.name = data.name
     project.description = data.description
     commit_or_conflict(session, "Project name already exists")

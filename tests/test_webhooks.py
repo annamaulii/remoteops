@@ -1,7 +1,7 @@
 import hashlib
 import hmac
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
@@ -27,20 +27,27 @@ def create_subscription(client: TestClient, name: str = "Acme") -> tuple[str, di
     return organization_id, response.json()
 
 
-def test_subscription_secret_is_returned_only_on_create(auth_client: TestClient) -> None:
+def test_subscription_secret_is_returned_only_on_create(
+    auth_client: TestClient,
+) -> None:
     organization_id, created = create_subscription(auth_client)
     listed = auth_client.get(f"/organizations/{organization_id}/webhooks")
 
     assert len(created["signing_secret"]) == 64
     assert "signing_secret" not in listed.json()[0]
-    assert auth_client.delete(
-        f"/organizations/{organization_id}/webhooks/{created['id']}"
-    ).status_code == 204
+    assert (
+        auth_client.delete(
+            f"/organizations/{organization_id}/webhooks/{created['id']}"
+        ).status_code
+        == 204
+    )
     assert auth_client.get(f"/organizations/{organization_id}/webhooks").json() == []
 
 
 def test_webhook_url_validation_blocks_ssrf_shapes(auth_client: TestClient) -> None:
-    organization_id = auth_client.post("/organizations", json={"name": "Acme"}).json()["id"]
+    organization_id = auth_client.post("/organizations", json={"name": "Acme"}).json()[
+        "id"
+    ]
     invalid_urls = [
         "http://webhooks.example.com/hook",
         "https://localhost/hook",
@@ -61,7 +68,9 @@ def test_webhook_url_validation_blocks_ssrf_shapes(auth_client: TestClient) -> N
 def test_subscription_requires_signing_secret(
     auth_client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    organization_id = auth_client.post("/organizations", json={"name": "Acme"}).json()["id"]
+    organization_id = auth_client.post("/organizations", json={"name": "Acme"}).json()[
+        "id"
+    ]
     monkeypatch.setattr(settings, "webhook_signing_secret", None)
 
     response = auth_client.post(
@@ -86,21 +95,34 @@ def test_webhook_management_enforces_rbac_and_idor(auth_client: TestClient) -> N
         json={"email": credentials["email"], "role": "member"},
     )
     login = auth_client.post(
-        "/auth/login", data={"username": credentials["email"], "password": credentials["password"]}
+        "/auth/login",
+        data={"username": credentials["email"], "password": credentials["password"]},
     ).json()
     member_headers = {"Authorization": f"Bearer {login['access_token']}"}
 
-    assert auth_client.post(
-        f"/organizations/{first_id}/webhooks",
-        json={"url": "https://webhooks.example.com/member", "event": "leave_request.decided"},
-        headers=member_headers,
-    ).status_code == 403
-    assert auth_client.get(
-        f"/organizations/{first_id}/webhooks", headers=member_headers
-    ).status_code == 403
-    assert auth_client.delete(
-        f"/organizations/{second_id}/webhooks/{created['id']}"
-    ).status_code == 404
+    assert (
+        auth_client.post(
+            f"/organizations/{first_id}/webhooks",
+            json={
+                "url": "https://webhooks.example.com/member",
+                "event": "leave_request.decided",
+            },
+            headers=member_headers,
+        ).status_code
+        == 403
+    )
+    assert (
+        auth_client.get(
+            f"/organizations/{first_id}/webhooks", headers=member_headers
+        ).status_code
+        == 403
+    )
+    assert (
+        auth_client.delete(
+            f"/organizations/{second_id}/webhooks/{created['id']}"
+        ).status_code
+        == 404
+    )
     assert user["email"] == credentials["email"]
 
 
@@ -114,7 +136,11 @@ def test_leave_decision_enqueues_delivery_in_same_transaction(
     ).json()["id"]
     leave_id = auth_client.post(
         f"/organizations/{organization_id}/leave-requests",
-        json={"contractor_id": contractor_id, "start_date": "2026-09-01", "end_date": "2026-09-02"},
+        json={
+            "contractor_id": contractor_id,
+            "start_date": "2026-09-01",
+            "end_date": "2026-09-02",
+        },
     ).json()["id"]
 
     response = auth_client.post(
@@ -140,7 +166,11 @@ def queued_delivery(
     ).json()["id"]
     leave_id = auth_client.post(
         f"/organizations/{organization_id}/leave-requests",
-        json={"contractor_id": contractor_id, "start_date": "2026-09-01", "end_date": "2026-09-02"},
+        json={
+            "contractor_id": contractor_id,
+            "start_date": "2026-09-01",
+            "end_date": "2026-09-02",
+        },
     ).json()["id"]
     auth_client.post(
         f"/organizations/{organization_id}/leave-requests/{leave_id}/decision",
@@ -157,7 +187,7 @@ def test_worker_signs_exact_stored_payload_and_succeeds(
     auth_client: TestClient, db_session: Session
 ) -> None:
     organization_id, delivery, secret = queued_delivery(auth_client, db_session)
-    now = datetime.now(timezone.utc) + timedelta(seconds=1)
+    now = datetime.now(UTC) + timedelta(seconds=1)
     captured = {}
 
     def sender(url: str, content: bytes, headers: dict[str, str]) -> int:
@@ -180,16 +210,19 @@ def test_worker_signs_exact_stored_payload_and_succeeds(
         f"/organizations/{organization_id}/webhook-deliveries"
     ).json()
     assert history[0]["attempts"][0]["status_code"] == 204
-    assert auth_client.get(
-        f"/organizations/{organization_id}/webhook-deliveries?limit=0"
-    ).status_code == 422
+    assert (
+        auth_client.get(
+            f"/organizations/{organization_id}/webhook-deliveries?limit=0"
+        ).status_code
+        == 422
+    )
 
 
 def test_worker_retries_then_fails_without_storing_exception(
     auth_client: TestClient, db_session: Session
 ) -> None:
     _, delivery, _ = queued_delivery(auth_client, db_session)
-    now = datetime.now(timezone.utc) + timedelta(seconds=1)
+    now = datetime.now(UTC) + timedelta(seconds=1)
 
     def unavailable(_url: str, _content: bytes, _headers: dict[str, str]) -> int:
         return 503
@@ -213,12 +246,15 @@ def test_worker_retries_then_fails_without_storing_exception(
     assert "private internal detail" not in repr(attempt.__dict__)
 
 
-def test_worker_skips_not_due_delivery(auth_client: TestClient, db_session: Session) -> None:
+def test_worker_skips_not_due_delivery(
+    auth_client: TestClient, db_session: Session
+) -> None:
     _, delivery, _ = queued_delivery(auth_client, db_session)
-    delivery.next_attempt_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    delivery.next_attempt_at = datetime.now(UTC) + timedelta(hours=1)
     db_session.flush()
 
     called = False
+
     def sender(_url: str, _content: bytes, _headers: dict[str, str]) -> int:
         nonlocal called
         called = True

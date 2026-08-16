@@ -47,8 +47,7 @@ def test_get_organization_reports_missing_id(auth_client: TestClient) -> None:
 def test_create_organization_validates_name(auth_client: TestClient) -> None:
     assert auth_client.post("/organizations", json={"name": "   "}).status_code == 422
     assert (
-        auth_client.post("/organizations", json={"name": "a" * 256}).status_code
-        == 422
+        auth_client.post("/organizations", json={"name": "a" * 256}).status_code == 422
     )
 
 
@@ -114,9 +113,12 @@ def test_different_users_can_reuse_idempotency_key(
     auth_client: TestClient, client: TestClient, db_session: Session
 ) -> None:
     key = {"Idempotency-Key": "shared-key"}
-    assert auth_client.post(
-        "/organizations", json={"name": "First user's org"}, headers=key
-    ).status_code == 201
+    assert (
+        auth_client.post(
+            "/organizations", json={"name": "First user's org"}, headers=key
+        ).status_code
+        == 201
+    )
     credentials = {"email": "second@example.com", "password": "strong-password"}
     assert client.post("/users/register", json=credentials).status_code == 201
     login = client.post(
@@ -165,9 +167,7 @@ def test_concurrent_idempotent_requests_create_one_organization() -> None:
         authorization = f"Bearer {login.json()['access_token']}"
 
     def create() -> tuple[int, dict, str | None]:
-        with TestClient(
-            app, headers={"Authorization": authorization}
-        ) as thread_client:
+        with TestClient(app, headers={"Authorization": authorization}) as thread_client:
             response = thread_client.post(
                 "/organizations", json={"name": organization_name}, headers=headers
             )
@@ -185,19 +185,27 @@ def test_concurrent_idempotent_requests_create_one_organization() -> None:
         assert results[0][1] == results[1][1]
         assert sorted(result[2] or "false" for result in results) == ["false", "true"]
         with SessionFactory() as session:
-            assert session.scalar(
-                select(func.count(Organization.id)).where(
-                    Organization.name == organization_name
+            assert (
+                session.scalar(
+                    select(func.count(Organization.id)).where(
+                        Organization.name == organization_name
+                    )
                 )
-            ) == 1
-            assert session.scalar(
-                select(func.count(IdempotencyRecord.id)).where(
-                    IdempotencyRecord.key_hash == key_hash
+                == 1
+            )
+            assert (
+                session.scalar(
+                    select(func.count(IdempotencyRecord.id)).where(
+                        IdempotencyRecord.key_hash == key_hash
+                    )
                 )
-            ) == 1
+                == 1
+            )
     finally:
         with SessionFactory.begin() as session:
-            user = session.scalar(select(User).where(User.email == credentials["email"]))
+            user = session.scalar(
+                select(User).where(User.email == credentials["email"])
+            )
             organization = session.scalar(
                 select(Organization).where(Organization.name == organization_name)
             )
@@ -210,8 +218,7 @@ def test_concurrent_idempotent_requests_create_one_organization() -> None:
 def test_list_organizations_paginates(auth_client: TestClient) -> None:
     for name in ("Alpha", "Beta", "Gamma"):
         assert (
-            auth_client.post("/organizations", json={"name": name}).status_code
-            == 201
+            auth_client.post("/organizations", json={"name": name}).status_code == 201
         )
 
     response = auth_client.get("/organizations?limit=2&offset=1")
@@ -250,9 +257,7 @@ def test_update_organization_handles_conflicts_and_missing_ids(
     conflict = auth_client.patch(
         f"/organizations/{first['id']}", json={"name": "Second"}
     )
-    missing = auth_client.patch(
-        f"/organizations/{uuid4()}", json={"name": "Missing"}
-    )
+    missing = auth_client.patch(f"/organizations/{uuid4()}", json={"name": "Missing"})
 
     assert conflict.status_code == 409
     assert missing.status_code == 404

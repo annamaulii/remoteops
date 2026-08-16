@@ -4,9 +4,7 @@ from fastapi.testclient import TestClient
 
 
 def create_context(client: TestClient, name: str = "Acme") -> tuple[str, str, str]:
-    organization_id = client.post(
-        "/organizations", json={"name": name}
-    ).json()["id"]
+    organization_id = client.post("/organizations", json={"name": name}).json()["id"]
     contractor_id = client.post(
         f"/organizations/{organization_id}/contractors",
         json={"name": "Ada", "email": f"ada-{name}@example.com"},
@@ -31,9 +29,7 @@ def test_records_and_lists_work_logs(auth_client: TestClient) -> None:
             "description": "Backend work",
         },
     )
-    listed = auth_client.get(
-        f"/organizations/{organization_id}/work-logs"
-    )
+    listed = auth_client.get(f"/organizations/{organization_id}/work-logs")
 
     assert created.status_code == 201
     assert created.json()["minutes"] == 480
@@ -57,7 +53,9 @@ def test_rejects_cross_organization_work_log(auth_client: TestClient) -> None:
     assert response.status_code == 404
 
 
-def create_work_log(client: TestClient, organization_id: str, contractor_id: str, project_id: str) -> str:
+def create_work_log(
+    client: TestClient, organization_id: str, contractor_id: str, project_id: str
+) -> str:
     response = client.post(
         f"/organizations/{organization_id}/work-logs",
         json={
@@ -105,7 +103,9 @@ def test_work_log_is_submitted_by_default(auth_client: TestClient) -> None:
 
 def test_work_log_approval_is_transactional(auth_client: TestClient) -> None:
     organization_id, contractor_id, project_id = create_context(auth_client)
-    work_log_id = create_work_log(auth_client, organization_id, contractor_id, project_id)
+    work_log_id = create_work_log(
+        auth_client, organization_id, contractor_id, project_id
+    )
 
     approval = auth_client.post(
         f"/organizations/{organization_id}/work-logs/{work_log_id}/decision",
@@ -127,7 +127,9 @@ def test_work_log_approval_is_transactional(auth_client: TestClient) -> None:
 
 def test_work_log_decision_requires_admin_role(auth_client: TestClient) -> None:
     organization_id, contractor_id, project_id = create_context(auth_client)
-    work_log_id = create_work_log(auth_client, organization_id, contractor_id, project_id)
+    work_log_id = create_work_log(
+        auth_client, organization_id, contractor_id, project_id
+    )
     register_user(auth_client, "member@example.com")
     auth_client.post(
         f"/organizations/{organization_id}/members",
@@ -156,7 +158,9 @@ def test_work_log_decision_requires_authentication(client: TestClient) -> None:
 def test_rejects_cross_organization_work_log_decision(auth_client: TestClient) -> None:
     organization_id, contractor_id, project_id = create_context(auth_client, "First")
     other_organization_id, _, _ = create_context(auth_client, "Second")
-    work_log_id = create_work_log(auth_client, organization_id, contractor_id, project_id)
+    work_log_id = create_work_log(
+        auth_client, organization_id, contractor_id, project_id
+    )
 
     response = auth_client.post(
         f"/organizations/{other_organization_id}/work-logs/{work_log_id}/decision",
@@ -212,12 +216,18 @@ def test_leave_request_approval_is_transactional(auth_client: TestClient) -> Non
 def test_leave_request_pagination_is_validated(auth_client: TestClient) -> None:
     organization_id, _, _ = create_context(auth_client)
 
-    assert auth_client.get(
-        f"/organizations/{organization_id}/leave-requests?limit=0"
-    ).status_code == 422
-    assert auth_client.get(
-        f"/organizations/{organization_id}/leave-requests?offset=-1"
-    ).status_code == 422
+    assert (
+        auth_client.get(
+            f"/organizations/{organization_id}/leave-requests?limit=0"
+        ).status_code
+        == 422
+    )
+    assert (
+        auth_client.get(
+            f"/organizations/{organization_id}/leave-requests?offset=-1"
+        ).status_code
+        == 422
+    )
 
 
 def test_rejects_invalid_leave_dates(auth_client: TestClient) -> None:

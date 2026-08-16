@@ -112,9 +112,9 @@ def list_documents(
         .limit(limit)
         .offset(offset)
     ).all()
-    total = session.scalar(
-        select(func.count()).select_from(Document).where(condition)
-    ) or 0
+    total = (
+        session.scalar(select(func.count()).select_from(Document).where(condition)) or 0
+    )
     return DocumentPage(
         items=[DocumentRead.model_validate(document) for document in documents],
         total=total,
@@ -134,9 +134,7 @@ def read_document(
     return get_document(organization_id, document_id, session)
 
 
-@router.patch(
-    "/{organization_id}/documents/{document_id}", response_model=DocumentRead
-)
+@router.patch("/{organization_id}/documents/{document_id}", response_model=DocumentRead)
 def update_document(
     organization_id: UUID,
     document_id: UUID,

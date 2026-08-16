@@ -199,11 +199,14 @@ def list_organizations(
         .limit(limit)
         .offset(offset)
     ).all()
-    total = session.scalar(
-        select(func.count())
-        .select_from(OrganizationMembership)
-        .where(membership_filter)
-    ) or 0
+    total = (
+        session.scalar(
+            select(func.count())
+            .select_from(OrganizationMembership)
+            .where(membership_filter)
+        )
+        or 0
+    )
     return OrganizationList(
         items=[OrganizationRead.model_validate(item) for item in organizations],
         total=total,
@@ -286,9 +289,7 @@ def add_member(
     actor = require_role(organization_id, user.id, session, {"owner", "admin"})
     if actor.role == "admin" and data.role != "member":
         raise HTTPException(status_code=403, detail="Insufficient permissions")
-    target = session.scalar(
-        select(User).where(User.email == str(data.email).lower())
-    )
+    target = session.scalar(select(User).where(User.email == str(data.email).lower()))
     if target is None:
         raise HTTPException(status_code=404, detail="User not found")
     membership = OrganizationMembership(
@@ -306,14 +307,12 @@ def add_member(
     return MemberRead(
         user_id=target.id,
         email=target.email,
-        role=membership.role,
+        role=data.role,
         created_at=membership.created_at,
     )
 
 
-@router.patch(
-    "/{organization_id}/members/{user_id}", response_model=MemberRead
-)
+@router.patch("/{organization_id}/members/{user_id}", response_model=MemberRead)
 def update_member(
     organization_id: UUID,
     user_id: UUID,

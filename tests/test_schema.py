@@ -8,9 +8,7 @@ def test_organizations_table_has_expected_columns() -> None:
     columns = inspector.get_columns("organizations")
 
     assert {column["name"] for column in columns} == {"id", "name", "created_at"}
-    assert inspector.get_pk_constraint("organizations")["constrained_columns"] == [
-        "id"
-    ]
+    assert inspector.get_pk_constraint("organizations")["constrained_columns"] == ["id"]
     assert {
         tuple(constraint["column_names"])
         for constraint in inspector.get_unique_constraints("organizations")
@@ -46,9 +44,7 @@ def test_auth_tokens_table_has_expected_columns() -> None:
         "expires_at",
         "created_at",
     }
-    assert inspector.get_pk_constraint("auth_tokens")["constrained_columns"] == [
-        "id"
-    ]
+    assert inspector.get_pk_constraint("auth_tokens")["constrained_columns"] == ["id"]
     assert {
         constraint["name"]
         for constraint in inspector.get_check_constraints("auth_tokens")
@@ -66,15 +62,11 @@ def test_organization_memberships_table_has_expected_columns() -> None:
         "created_at",
     }
     assert set(
-        inspector.get_pk_constraint("organization_memberships")[
-            "constrained_columns"
-        ]
+        inspector.get_pk_constraint("organization_memberships")["constrained_columns"]
     ) == {"organization_id", "user_id"}
     assert {
         constraint["name"]
-        for constraint in inspector.get_check_constraints(
-            "organization_memberships"
-        )
+        for constraint in inspector.get_check_constraints("organization_memberships")
     } == {"valid_organization_role"}
 
 
@@ -155,15 +147,28 @@ def test_document_and_audit_tables_have_expected_columns() -> None:
 def test_webhook_tables_have_expected_columns() -> None:
     inspector = inspect(engine)
 
-    assert {column["name"] for column in inspector.get_columns("webhook_subscriptions")} == {
-        "id", "organization_id", "url", "event", "created_at"
-    }
-    assert {column["name"] for column in inspector.get_columns("webhook_deliveries")} == {
-        "id", "subscription_id", "event", "payload", "status",
-        "attempt_count", "next_attempt_at", "created_at", "updated_at",
+    assert {
+        column["name"] for column in inspector.get_columns("webhook_subscriptions")
+    } == {"id", "organization_id", "url", "event", "created_at"}
+    assert {
+        column["name"] for column in inspector.get_columns("webhook_deliveries")
+    } == {
+        "id",
+        "subscription_id",
+        "event",
+        "payload",
+        "status",
+        "attempt_count",
+        "next_attempt_at",
+        "created_at",
+        "updated_at",
     }
     assert {column["name"] for column in inspector.get_columns("webhook_attempts")} == {
-        "id", "delivery_id", "attempt_number", "status_code", "error_code",
+        "id",
+        "delivery_id",
+        "attempt_number",
+        "status_code",
+        "error_code",
         "attempted_at",
     }
     assert "ix_webhook_deliveries_due" in {

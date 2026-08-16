@@ -72,9 +72,10 @@ def list_audit_events(
         .limit(limit)
         .offset(offset)
     ).all()
-    total = session.scalar(
-        select(func.count()).select_from(AuditEvent).where(condition)
-    ) or 0
+    total = (
+        session.scalar(select(func.count()).select_from(AuditEvent).where(condition))
+        or 0
+    )
     return AuditEventPage(
         items=[AuditEventRead.model_validate(event) for event in events],
         total=total,
