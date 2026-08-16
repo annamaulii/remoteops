@@ -39,6 +39,7 @@ class WorkLogRead(BaseModel):
     work_date: date
     minutes: int
     description: str
+    status: Literal["submitted", "approved", "rejected"]
     created_at: datetime
 
 
@@ -77,7 +78,8 @@ class ApprovalRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    leave_request_id: UUID
+    leave_request_id: UUID | None
+    work_log_id: UUID | None
     reviewer_user_id: UUID
     decision: Literal["approved", "rejected"]
     note: str
@@ -96,6 +98,20 @@ def get_leave(
     if leave is None:
         raise HTTPException(status_code=404, detail="Leave request not found")
     return leave
+
+
+def get_work_log(
+    organization_id: UUID, work_log_id: UUID, session: Session
+) -> WorkLog:
+    work_log = session.scalar(
+        select(WorkLog).where(
+            WorkLog.id == work_log_id,
+            WorkLog.organization_id == organization_id,
+        )
+    )
+    if work_log is None:
+        raise HTTPException(status_code=404, detail="Work log not found")
+    return work_log
 
 
 @router.post(
@@ -137,6 +153,49 @@ def list_work_logs(
             .offset(offset)
         ).all()
     )
+
+
+@router.post(
+    "/{organization_id}/work-logs/{work_log_id}/decision",
+    response_model=ApprovalRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def decide_work_log(
+    organization_id: UUID,
+    work_log_id: UUID,
+    data: DecisionCreate,
+    session: SessionDependency,
+    user: CurrentUser,
+) -> Approval:
+    require_role(organization_id, user.id, session, {"owner", "admin"})
+    work_log = get_work_log(organization_id, work_log_id, session)
+    if work_log.status != "submitted":
+        raise HTTPException(status_code=409, detail="Work log already decided")
+    work_log.status = data.decision
+    approval = Approval(
+        work_log_id=work_log.id,
+        reviewer_user_id=user.id,
+        decision=data.decision,
+        note=data.note,
+    )
+    session.add(approval)
+    record_audit(
+        session,
+        organization_id,
+        user.id,
+        data.decision,
+        "work_log",
+        work_log.id,
+    )
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(
+            status_code=409, detail="Work log already decided"
+        ) from None
+    session.refresh(approval)
+    return approval
 
 
 @router.post(
