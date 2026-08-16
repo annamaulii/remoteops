@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     webhook_signing_secret: Annotated[SecretStr, Field(min_length=32)] | None = None
     webhook_allowed_hosts: str = ""
     webhook_worker_poll_seconds: Annotated[float, Field(gt=0)] = 5
+    cors_allowed_origins: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

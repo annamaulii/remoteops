@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -13,8 +14,23 @@ from remoteops.users import router as users_router
 from remoteops.webhooks import router as webhooks_router
 from remoteops.workflows import router as workflows_router
 
+
+def parse_cors_origins(value: str) -> list[str]:
+    """Split a comma-separated origin list, dropping blanks and whitespace."""
+    return [origin.strip() for origin in value.split(",") if origin.strip()]
+
+
 app = FastAPI(title="RemoteOps", version="0.1.0")
 configure_reliability(app, settings.auth_rate_limit, settings.auth_rate_window_seconds)
+
+cors_origins = parse_cors_origins(settings.cors_allowed_origins)
+if cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 app.include_router(audit_router)
 app.include_router(documents_router)
 app.include_router(organizations_router)
