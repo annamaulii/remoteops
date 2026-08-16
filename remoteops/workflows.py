@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -25,8 +25,8 @@ class WorkLogCreate(BaseModel):
     contractor_id: UUID
     project_id: UUID
     work_date: date
-    minutes: Annotated[int, Field(ge=1, le=1440)]
-    description: Annotated[str, Field(max_length=2000)] = ""
+    minutes: Annotated[int, Field(ge=1, le=1440, examples=[480])]
+    description: Annotated[str, Field(max_length=2000, examples=["Backend work"])] = ""
 
 
 class WorkLogRead(BaseModel):
@@ -43,11 +43,18 @@ class WorkLogRead(BaseModel):
     created_at: datetime
 
 
+class WorkLogPage(BaseModel):
+    items: list[WorkLogRead]
+    total: int
+    limit: int
+    offset: int
+
+
 class LeaveCreate(BaseModel):
     contractor_id: UUID
     start_date: date
     end_date: date
-    reason: Annotated[str, Field(max_length=2000)] = ""
+    reason: Annotated[str, Field(max_length=2000, examples=["Family holiday"])] = ""
 
     @model_validator(mode="after")
     def validate_dates(self) -> "LeaveCreate":
@@ -69,9 +76,16 @@ class LeaveRead(BaseModel):
     created_at: datetime
 
 
+class LeavePage(BaseModel):
+    items: list[LeaveRead]
+    total: int
+    limit: int
+    offset: int
+
+
 class DecisionCreate(BaseModel):
     decision: Literal["approved", "rejected"]
-    note: Annotated[str, Field(max_length=2000)] = ""
+    note: Annotated[str, Field(max_length=2000, examples=["Looks good"])] = ""
 
 
 class ApprovalRead(BaseModel):
@@ -84,6 +98,13 @@ class ApprovalRead(BaseModel):
     decision: Literal["approved", "rejected"]
     note: str
     created_at: datetime
+
+
+class ApprovalPage(BaseModel):
+    items: list[ApprovalRead]
+    total: int
+    limit: int
+    offset: int
 
 
 def get_leave(organization_id: UUID, leave_id: UUID, session: Session) -> LeaveRequest:
@@ -131,23 +152,60 @@ def create_work_log(
     return work_log
 
 
-@router.get("/{organization_id}/work-logs", response_model=list[WorkLogRead])
+@router.get("/{organization_id}/work-logs", response_model=WorkLogPage)
 def list_work_logs(
     organization_id: UUID,
     session: SessionDependency,
     user: CurrentUser,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
-) -> list[WorkLog]:
+    work_log_status: Annotated[
+        Literal["submitted", "approved", "rejected"] | None,
+        Query(alias="status"),
+    ] = None,
+    contractor_id: UUID | None = None,
+    project_id: UUID | None = None,
+    work_date_from: date | None = None,
+    work_date_to: date | None = None,
+) -> WorkLogPage:
     get_membership(organization_id, user.id, session)
-    return list(
-        session.scalars(
-            select(WorkLog)
-            .where(WorkLog.organization_id == organization_id)
-            .order_by(WorkLog.work_date.desc(), WorkLog.id)
-            .limit(limit)
-            .offset(offset)
-        ).all()
+    if (
+        work_date_from is not None
+        and work_date_to is not None
+        and work_date_from > work_date_to
+    ):
+        raise HTTPException(
+            status_code=422, detail="work_date_from must be on or before work_date_to"
+        )
+
+    conditions = [WorkLog.organization_id == organization_id]
+    if work_log_status is not None:
+        conditions.append(WorkLog.status == work_log_status)
+    if contractor_id is not None:
+        conditions.append(WorkLog.contractor_id == contractor_id)
+    if project_id is not None:
+        conditions.append(WorkLog.project_id == project_id)
+    if work_date_from is not None:
+        conditions.append(WorkLog.work_date >= work_date_from)
+    if work_date_to is not None:
+        conditions.append(WorkLog.work_date <= work_date_to)
+
+    items = session.scalars(
+        select(WorkLog)
+        .where(*conditions)
+        .order_by(WorkLog.work_date.desc(), WorkLog.id)
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    total = (
+        session.scalar(select(func.count()).select_from(WorkLog).where(*conditions))
+        or 0
+    )
+    return WorkLogPage(
+        items=[WorkLogRead.model_validate(item) for item in items],
+        total=total,
+        limit=limit,
+        offset=offset,
     )
 
 
@@ -169,6 +227,7 @@ def decide_work_log(
         raise HTTPException(status_code=409, detail="Work log already decided")
     work_log.status = data.decision
     approval = Approval(
+        organization_id=organization_id,
         work_log_id=work_log.id,
         reviewer_user_id=user.id,
         decision=data.decision,
@@ -214,23 +273,32 @@ def create_leave_request(
     return leave
 
 
-@router.get("/{organization_id}/leave-requests", response_model=list[LeaveRead])
+@router.get("/{organization_id}/leave-requests", response_model=LeavePage)
 def list_leave_requests(
     organization_id: UUID,
     session: SessionDependency,
     user: CurrentUser,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
-) -> list[LeaveRequest]:
+) -> LeavePage:
     get_membership(organization_id, user.id, session)
-    return list(
-        session.scalars(
-            select(LeaveRequest)
-            .where(LeaveRequest.organization_id == organization_id)
-            .order_by(LeaveRequest.created_at.desc(), LeaveRequest.id)
-            .limit(limit)
-            .offset(offset)
-        ).all()
+    condition = LeaveRequest.organization_id == organization_id
+    items = session.scalars(
+        select(LeaveRequest)
+        .where(condition)
+        .order_by(LeaveRequest.created_at.desc(), LeaveRequest.id)
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    total = (
+        session.scalar(select(func.count()).select_from(LeaveRequest).where(condition))
+        or 0
+    )
+    return LeavePage(
+        items=[LeaveRead.model_validate(item) for item in items],
+        total=total,
+        limit=limit,
+        offset=offset,
     )
 
 
@@ -252,6 +320,7 @@ def decide_leave_request(
         raise HTTPException(status_code=409, detail="Leave request already decided")
     leave.status = data.decision
     approval = Approval(
+        organization_id=organization_id,
         leave_request_id=leave.id,
         reviewer_user_id=user.id,
         decision=data.decision,
@@ -284,3 +353,41 @@ def decide_leave_request(
         ) from None
     session.refresh(approval)
     return approval
+
+
+@router.get("/{organization_id}/approvals", response_model=ApprovalPage)
+def list_approvals(
+    organization_id: UUID,
+    session: SessionDependency,
+    user: CurrentUser,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    target_type: Annotated[Literal["work_log", "leave_request"] | None, Query()] = None,
+    decision: Annotated[Literal["approved", "rejected"] | None, Query()] = None,
+) -> ApprovalPage:
+    get_membership(organization_id, user.id, session)
+    conditions = [Approval.organization_id == organization_id]
+    if target_type == "work_log":
+        conditions.append(Approval.work_log_id.is_not(None))
+    elif target_type == "leave_request":
+        conditions.append(Approval.leave_request_id.is_not(None))
+    if decision is not None:
+        conditions.append(Approval.decision == decision)
+
+    items = session.scalars(
+        select(Approval)
+        .where(*conditions)
+        .order_by(Approval.created_at.desc(), Approval.id)
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    total = (
+        session.scalar(select(func.count()).select_from(Approval).where(*conditions))
+        or 0
+    )
+    return ApprovalPage(
+        items=[ApprovalRead.model_validate(item) for item in items],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )

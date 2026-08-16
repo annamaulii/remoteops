@@ -148,6 +148,7 @@ class WorkLog(Base):
             "status IN ('submitted', 'approved', 'rejected')",
             name="valid_work_log_status",
         ),
+        Index("ix_work_logs_org_date", "organization_id", "work_date"),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -206,9 +207,13 @@ class Approval(Base):
             "(leave_request_id IS NOT NULL) <> (work_log_id IS NOT NULL)",
             name="approval_target_exclusive",
         ),
+        Index("ix_approvals_org_created", "organization_id", "created_at"),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    organization_id: Mapped[UUID] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE")
+    )
     leave_request_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("leave_requests.id", ondelete="CASCADE"),
         unique=True,
