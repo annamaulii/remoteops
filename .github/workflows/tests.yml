@@ -56,3 +56,33 @@ jobs:
 
       - name: Run tests
         run: python -m pytest
+
+  container:
+    name: Container
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: ci-postgres-password
+      JWT_SECRET: test-only-secret-at-least-32-characters
+      WEBHOOK_SIGNING_SECRET: test-webhook-secret-at-least-32-characters
+      WEBHOOK_ALLOWED_HOSTS: webhooks.example.com
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+
+      - name: Build runtime image
+        run: docker build --tag remoteops:test .
+
+      - name: Start runtime stack
+        run: docker compose up --build --detach --wait
+
+      - name: Check API readiness
+        run: curl --fail --silent --show-error http://127.0.0.1:8000/ready
+
+      - name: Stop runtime stack
+        if: always()
+        run: docker compose down --volumes

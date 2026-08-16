@@ -1,10 +1,22 @@
+x-app: &app
+  image: remoteops:local
+  build: .
+  environment:
+    DATABASE_URL: postgresql+psycopg://remoteops:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/remoteops
+    JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+    AUTH_RATE_LIMIT: ${AUTH_RATE_LIMIT:-100}
+    AUTH_RATE_WINDOW_SECONDS: ${AUTH_RATE_WINDOW_SECONDS:-60}
+    WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:?Set WEBHOOK_SIGNING_SECRET in .env}
+    WEBHOOK_ALLOWED_HOSTS: ${WEBHOOK_ALLOWED_HOSTS:?Set WEBHOOK_ALLOWED_HOSTS in .env}
+    WEBHOOK_WORKER_POLL_SECONDS: ${WEBHOOK_WORKER_POLL_SECONDS:-5}
+
 services:
   postgres:
     image: postgres:18.3-alpine
     environment:
       POSTGRES_DB: remoteops
       POSTGRES_USER: remoteops
-      POSTGRES_PASSWORD: remoteops
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
@@ -14,6 +26,40 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  migrate:
+    <<: *app
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *app
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready', timeout=2)",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  webhook-worker:
+    <<: *app
+    command: ["python", "-m", "remoteops.worker"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:
