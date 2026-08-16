@@ -56,3 +56,40 @@ ruff check remoteops tests migrations/env.py
 ruff format --check remoteops tests migrations/env.py
 mypy remoteops
 ```
+
+## Frontend
+
+The `frontend/` directory is a Vite + Vue 3 + TypeScript app covering the
+core workflow: log in, pick or create an organization, add a project and a
+contractor, log work, and approve or reject it.
+
+```bash
+cd frontend
+cp .env.example .env   # VITE_API_BASE_URL, defaults to http://localhost:8000
+npm install
+npm run dev             # http://localhost:5173
+npm run test
+npm run typecheck
+npm run build
+```
+
+The API must have `CORS_ALLOWED_ORIGINS=http://localhost:5173` set (see the
+backend `.env.example`) or the browser will block every request.
+
+### Known limitations
+
+- No project/contractor/organization editing or deletion in the UI — only
+  create and list, matching the roadmap's "minimal" scope for this stage.
+- The access token lives in memory only and the refresh token in
+  `sessionStorage` (not `localStorage`); both are lost if the tab is closed.
+  This is a deliberate trade-off, not an oversight — the backend issues
+  bearer tokens rather than httpOnly cookies, so this is the safer option
+  available without a backend auth redesign. See the comment in
+  `frontend/src/stores/auth.ts`.
+- No pagination controls in the UI yet — list views show the first page
+  only (the backend's pagination/filtering from Week 8 isn't surfaced here).
+- No production hosting is configured. `npm run build` produces a static
+  `frontend/dist/` that can be served by any static file host; there is no
+  Docker service or CI job for it yet.
+- Visual design is intentionally minimal — one shared stylesheet, no
+  component library, one responsive breakpoint.

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useAuthStore } from './auth'
 import * as authApi from '../api/auth'
+import { ApiError } from '../api/client'
 
 vi.mock('../api/auth')
 
@@ -89,5 +90,43 @@ describe('useAuthStore', () => {
 
     expect(store.isAuthenticated).toBe(false)
     expect(sessionStorage.getItem('remoteops.refresh_token')).toBeNull()
+  })
+
+  it('withAuth retries once via refresh after a 401 and succeeds', async () => {
+    sessionStorage.setItem('remoteops.refresh_token', 'refresh-1')
+    mockedAuthApi.refresh.mockResolvedValue({
+      access_token: 'access-2',
+      refresh_token: 'refresh-2',
+      token_type: 'bearer',
+    })
+    mockedAuthApi.me.mockResolvedValue({
+      id: 'user-1',
+      email: 'anna@example.com',
+      created_at: '2026-01-01T00:00:00Z',
+    })
+
+    const store = useAuthStore()
+    store.accessToken = 'stale-access'
+    const call = vi
+      .fn()
+      .mockRejectedValueOnce(new ApiError(401, 'unauthorized', 'Expired', 'r1'))
+      .mockResolvedValueOnce('ok')
+
+    const result = await store.withAuth(call)
+
+    expect(result).toBe('ok')
+    expect(call).toHaveBeenNthCalledWith(2, 'access-2')
+  })
+
+  it('withAuth clears the session when the retry also fails', async () => {
+    sessionStorage.setItem('remoteops.refresh_token', 'refresh-1')
+    mockedAuthApi.refresh.mockRejectedValue(new Error('expired'))
+
+    const store = useAuthStore()
+    store.accessToken = 'stale-access'
+    const call = vi.fn().mockRejectedValue(new ApiError(401, 'unauthorized', 'Expired', 'r1'))
+
+    await expect(store.withAuth(call)).rejects.toBeInstanceOf(ApiError)
+    expect(store.isAuthenticated).toBe(false)
   })
 })
